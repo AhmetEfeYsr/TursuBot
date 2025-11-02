@@ -10,8 +10,8 @@
         @import url('https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap');
         html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background-color: transparent; font-family: 'Roboto', sans-serif; -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; text-rendering: optimizeSpeed; transform: translateZ(0); backface-visibility: hidden; image-rendering: optimizeSpeed; image-rendering: -webkit-optimize-contrast; image-rendering: crisp-edges; image-rendering: pixelated; }
         body { position: relative; min-width: 100vw; min-height: 100vh; }
-        .karakter { width: 100px; height: 120px; background-image: url('karakter.png'); background-size: 100px 120px; background-repeat: no-repeat; background-position: center; position: absolute; top: -150px; left: -150px; opacity: 0; z-index: 10; transition: opacity 0.3s ease; will-change: transform; transform: translateZ(0); }
-        #havuz { width: 298px; height: 83px; background-image: url('havuz.svg'), url('havuz.png'); background-size: 298px 83px; background-repeat: no-repeat; background-position: center; position: absolute; bottom: 0; left: 50%; transform: translateX(-50%) translateZ(0); box-sizing: border-box; transition: opacity 0.5s ease; z-index: 5; will-change: transform, opacity; backface-visibility: hidden; image-rendering: optimizeSpeed; image-rendering: crisp-edges; }
+        .karakter { width: 100px; height: auto; background-image: url('karakter.png'); background-size: contain; background-repeat: no-repeat; background-position: center; position: absolute; top: -150px; left: -150px; opacity: 0; z-index: 10; transition: opacity 0.3s ease; will-change: transform; transform: translateZ(0); }
+        #havuz { width: 298px; height: auto; background-image: url('havuz.svg'), url('havuz.png'); background-size: contain; background-repeat: no-repeat; background-position: center; position: absolute; bottom: 0; left: 50%; transform: translateX(-50%) translateZ(0); box-sizing: border-box; transition: opacity 0.5s ease; z-index: 5; will-change: transform, opacity; backface-visibility: hidden; image-rendering: optimizeSpeed; image-rendering: crisp-edges; }
     </style>
     </head>
 
@@ -133,7 +133,11 @@
             },
             testModu: false,
             fizik: { yerCekimi: 0.05, temelHiz: 3, hizVaryasyon: 1.5, minimumAci: 15, maksimumAci: 60, minimumIvme: 0.66, maksimumIvme: 1 },
-            puanlama: { basariMesafeSiniri: 135, puanlamaKatsayisi: 1.35 }
+            puanlama: { 
+                // YENİ: Bu değerler target boyutuna göre dinamik olarak hesaplanacak
+                basariMesafeSiniri: 135,  // Varsayılan (target genişliği / 2)
+                puanlamaKatsayisi: 1.35   // Varsayılan (basariMesafeSiniri * 0.01)
+            }
         };
 
         if (AYARLAR.kickApiToken) {
@@ -195,12 +199,23 @@
                     const targetAlan = targetGercekGenislik * targetGercekYukseklik;
                     skorCarpani = Math.sqrt(temelAlan / targetAlan); // Küçük hedef = daha yüksek çarpan
                     
+                    // YENİ: Dinamik puanlama hesaplaması
+                    // basariMesafeSiniri = hedefin genişliğinin yarısı
+                    AYARLAR.puanlama.basariMesafeSiniri = targetGercekGenislik / 2;
+                    // puanlamaKatsayisi = basariMesafeSiniri'nin %1'i
+                    AYARLAR.puanlama.puanlamaKatsayisi = AYARLAR.puanlama.basariMesafeSiniri * 0.01;
+                    
                     console.log(`🎯 Target boyutu algılandı: ${targetGercekGenislik}x${targetGercekYukseklik}`);
                     console.log(`📊 Skor çarpanı: ${skorCarpani.toFixed(2)}x (Temel havuza göre)`);
+                    console.log(`📏 Başarı mesafe sınırı: ${AYARLAR.puanlama.basariMesafeSiniri.toFixed(1)} piksel (Target genişliği / 2)`);
+                    console.log(`📐 Puanlama katsayısı: ${AYARLAR.puanlama.puanlamaKatsayisi.toFixed(3)} (Başarı sınırının %1'i)`);
                     resolve();
                 };
                 testImg.onerror = function() {
                     console.warn(`⚠️ Target resmi yüklenemedi, varsayılan boyutlar kullanılıyor`);
+                    // Varsayılan değerlerle de hesapla
+                    AYARLAR.puanlama.basariMesafeSiniri = targetGercekGenislik / 2;
+                    AYARLAR.puanlama.puanlamaKatsayisi = AYARLAR.puanlama.basariMesafeSiniri * 0.01;
                     resolve();
                 };
                 // PNG'yi dene, yoksa SVG
@@ -211,7 +226,6 @@
         function rastgeleHavuzKonumu() {
             const guncelGenislik = Math.max(window.innerWidth, document.documentElement.clientWidth) || 1920;
             const havuzGenisligi = Math.round(targetGercekGenislik * ortalamaOran);
-            const havuzYuksekligi = Math.round(targetGercekYukseklik * ortalamaOran);
             const guvenliMargin = Math.round(50 * ortalamaOran);
             const solSinir = guvenliMargin;
             const sagSinir = guncelGenislik - havuzGenisligi - guvenliMargin;
@@ -222,11 +236,11 @@
             havuz.style.transform = 'none';
             havuz.style.opacity = '1';
             havuz.style.width = havuzGenisligi + 'px';
-            havuz.style.height = havuzYuksekligi + 'px';
+            havuz.style.height = 'auto'; // YENİ: Yükseklik otomatik (en-boy oranı korunsun)
             
             // YENİ: Havuz resmini ve boyutunu tekrar ayarla
             havuz.style.backgroundImage = `url('${targetBaseName}.svg'), url('${targetBaseName}.png')`;
-            havuz.style.backgroundSize = havuzGenisligi + 'px ' + havuzYuksekligi + 'px';
+            havuz.style.backgroundSize = 'contain'; // YENİ: Resim oranı korunsun
 
             havuzGizli = false;
             atlayanKullanicilar.clear();
@@ -234,7 +248,12 @@
                 clearTimeout(havuzGizlemeTimer);
                 havuzGizlemeTimer = null;
             }
-            console.log(`Havuz konumu: x=${rastgeleX}, Boyut: ${havuzGenisligi}x${havuzYuksekligi}`);
+            
+            // Gerçek yüksekliği DOM'dan al
+            setTimeout(() => {
+                const gercekYukseklik = havuz.offsetHeight || Math.round(targetGercekYukseklik * ortalamaOran);
+                console.log(`Havuz konumu: x=${rastgeleX}, Boyut: ${havuzGenisligi}x${gercekYukseklik} (oran korundu)`);
+            }, 50);
         }
 
         // Target boyutunu algıla ve başlat
@@ -280,7 +299,6 @@
             console.log(`🎨 Karakter elementi oluşturuldu: ${kullaniciAdi}`);
             
             let karakterGenisligi;
-            let karakterYuksekligi;
             const emojiUrl = emojiId ? `https://files.kick.com/emotes/${emojiId}/fullsize` : null;
             let karakterBulundu = false;
             const normalizedUsername = kullaniciAdi.toLowerCase();
@@ -290,7 +308,6 @@
             if (emojiUrl) {
                 karakter.style.backgroundImage = `url('${emojiUrl}')`;
                 karakterGenisligi = Math.round(80 * ortalamaOran);
-                karakterYuksekligi = Math.round(80 * ortalamaOran);
                 console.log(`🎨 ${kullaniciAdi} - Emoji karakteri kullanılıyor: ${emojiId}`);
                 karakterBulundu = true;
             }
@@ -300,13 +317,11 @@
                 if (normalizedUsername === 'pairaaa') {
                     karakter.style.backgroundImage = "url('pairaaa.svg'), url('pairaaa.png')";
                     karakterGenisligi = Math.round(90 * ortalamaOran);
-                    karakterYuksekligi = Math.round(108 * ortalamaOran);
                     console.log(`🌟 ${kullaniciAdi} - Özel karakter kullanılıyor!`);
                     karakterBulundu = true;
                 } else if (normalizedUsername === 'himilayk') {
                     karakter.style.backgroundImage = "url('himilayk.svg'), url('himilayk.png')";
                     karakterGenisligi = Math.round(90 * ortalamaOran);
-                    karakterYuksekligi = Math.round(108 * ortalamaOran);
                     console.log(`🌟 ${kullaniciAdi} - Özel karakter kullanılıyor!`);
                     karakterBulundu = true;
                 }
@@ -319,7 +334,6 @@
                     if (kucukHarfKullanicilar.includes(normalizedUsername)) {
                         karakter.style.backgroundImage = `url('${grup.resim}')`;
                         karakterGenisligi = Math.round(90 * ortalamaOran);
-                        karakterYuksekligi = Math.round(108 * ortalamaOran);
                         console.log(`👥 ${kullaniciAdi} - '${grup.resim}' grup karakteri kullanılıyor!`);
                         karakterBulundu = true;
                         break;
@@ -330,12 +344,12 @@
             if (!karakterBulundu) {
                 karakter.style.backgroundImage = `url('${charBaseName}.svg'), url('${charBaseName}.png')`;
                 karakterGenisligi = Math.round(90 * ortalamaOran);
-                karakterYuksekligi = Math.round(108 * ortalamaOran);
             }
             
+            // YENİ: Sadece genişlik ayarla, yükseklik otomatik olsun (en-boy oranı korunsun)
             karakter.style.width = karakterGenisligi + 'px';
-            karakter.style.height = karakterYuksekligi + 'px';
-            karakter.style.backgroundSize = karakterGenisligi + 'px ' + karakterYuksekligi + 'px';
+            karakter.style.height = 'auto';
+            karakter.style.backgroundSize = 'contain'; // YENİ: Resim oranı korunsun
             karakter.style.backgroundRepeat = 'no-repeat';
             karakter.style.backgroundPosition = 'center';
             karakter.style.position = 'absolute';
@@ -371,8 +385,18 @@
             karakter.style.top = '0px';
             karakter.style.position = 'absolute';
             
-            // YENİ: Karakter için canvas oluştur (çarpışma tespiti için)
-            karakterIcinCanvasOlustur(kullaniciAdi, karakter, karakterGenisligi, karakterYuksekligi);
+            // YENİ: DOM'dan gerçek yüksekliği al (en-boy oranı korunmuş haliyle)
+            // Tarayıcıya render için zaman ver
+            setTimeout(() => {
+                const karakterYuksekligi = karakter.offsetHeight || Math.round(108 * ortalamaOran); // Fallback
+                console.log(`📐 Karakter boyutu: ${karakterGenisligi}x${karakterYuksekligi} (oran korundu)`);
+                
+                // YENİ: Karakter için canvas oluştur (çarpışma tespiti için)
+                karakterIcinCanvasOlustur(kullaniciAdi, karakter, karakterGenisligi, karakterYuksekligi);
+            }, 10);
+            
+            // Geçici yükseklik değeri (gerçek değer birazdan alınacak)
+            let karakterYuksekligi = Math.round(108 * ortalamaOran);
             
             const guncelYukseklik = Math.max(window.innerHeight, document.documentElement.clientHeight) || 1080;
             const guvenliKarakterMargin = Math.round(20 * ortalamaOran);
@@ -428,7 +452,10 @@
                 
                 const sikeAnimasyon = (mevcutZaman) => {
                     const mevcutPozisyon = karakterPozisyonlari.get(kullaniciAdi);
-                    if (!mevcutPozisyon) return; 
+                    if (!mevcutPozisyon) return;
+                    
+                    // YENİ: Gerçek yüksekliği DOM'dan al (en-boy oranı korunmuş)
+                    karakterYuksekligi = karakter.offsetHeight || karakterYuksekligi; 
 
                     const gecenSure = mevcutZaman - baslangicZamani;
                     let t = Math.min(gecenSure / sikeAtlamaSuresi, 1.0);
@@ -542,6 +569,9 @@
                 if (!mevcutPozisyon) {
                     return;
                 }
+                
+                // YENİ: Gerçek yüksekliği DOM'dan al (en-boy oranı korunmuş)
+                karakterYuksekligi = karakter.offsetHeight || karakterYuksekligi;
                 
                 x = mevcutPozisyon.x;
                 y = mevcutPozisyon.y;
@@ -679,30 +709,31 @@
                         const puanlamaKatsayisi = AYARLAR.puanlama.puanlamaKatsayisi * ortalamaOran;
                         if (mesafe < basariMesafeSiniri) {
                             basariliAtlayis = true;
-                            // YENİ: Target boyutuna göre skor çarpanı uygula
-                            const temelPuan = Math.max(0, Math.min(100, Math.round((basariMesafeSiniri - mesafe) / puanlamaKatsayisi)));
-                            const puan = Math.round(temelPuan * skorCarpani);
-                            const finalPuan = Math.min(100, puan); // 100'ü aşmasın
+                            // YENİ: Dinamik puanlama - target boyutuna göre otomatik ayarlanıyor
+                            const puan = Math.max(0, Math.min(100, Math.round((basariMesafeSiniri - mesafe) / puanlamaKatsayisi)));
                             
+                            // Hedef boyutu bilgisi (küçük hedef için ek mesaj)
                             let zorlukBilgisi = '';
-                            if (skorCarpani > 1.1) {
-                                zorlukBilgisi = ` (${skorCarpani.toFixed(1)}x zorluk bonusu!)`;
+                            if (targetGercekGenislik < 200) {
+                                zorlukBilgisi = ` 🎯 Küçük hedef!`;
+                            } else if (targetGercekGenislik > 400) {
+                                zorlukBilgisi = ` 🎪 Büyük hedef!`;
                             }
                             
-                            console.log(`🏆 HAVUZ TUTTURULDU! ${kullaniciAdi} - Puan: ${finalPuan}, Mesafe: ${mesafe.toFixed(1)}, Çarpan: ${skorCarpani.toFixed(2)}x`);
+                            console.log(`🏆 HAVUZ TUTTURULDU! ${kullaniciAdi} - Puan: ${puan}, Mesafe: ${mesafe.toFixed(1)}, Target: ${targetGercekGenislik}x${targetGercekYukseklik}`);
                             
-                            const skorMesaji = `Tebrikler @${kullaniciAdi}! Havuzu ${finalPuan.toFixed(0)} puanla tutturdun!${zorlukBilgisi}`;
+                            const skorMesaji = `Tebrikler @${kullaniciAdi}! Havuzu ${puan.toFixed(0)} puanla tutturdun!${zorlukBilgisi}`;
                             sendChatMessageToKick(skorMesaji);
                             
-                            sonSkorlar.unshift({ username: kullaniciAdi, score: finalPuan });
+                            sonSkorlar.unshift({ username: kullaniciAdi, score: puan });
                             if (sonSkorlar.length > 10) {
                                 sonSkorlar.pop();
                             }
 
                             const mevcutEnIyi = enIyiSkorlarMap.get(kullaniciAdi) || 0;
-                            if (finalPuan > mevcutEnIyi) {
-                                enIyiSkorlarMap.set(kullaniciAdi, finalPuan);
-                                console.log(`🎉 YENİ KİŞİSEL REKOR! ${kullaniciAdi}: ${finalPuan} puan`);
+                            if (puan > mevcutEnIyi) {
+                                enIyiSkorlarMap.set(kullaniciAdi, puan);
+                                console.log(`🎉 YENİ KİŞİSEL REKOR! ${kullaniciAdi}: ${puan} puan`);
                             }
                             
                             let genelEnIyiSkor = 0;
