@@ -172,12 +172,46 @@
         
         let enIyiSkorlarMap = new Map();
         let sonSkorlar = [];
+        
+        // YENİ: Canvas tabanlı çarpışma tespiti için
+        let karakterCanvaslari = new Map(); // Her karakter için canvas tutar
+        
+        // YENİ: Target boyutu ve skorlama çarpanı
+        let targetGercekGenislik = 298;  // Varsayılan havuz genişliği
+        let targetGercekYukseklik = 83;  // Varsayılan havuz yüksekliği
+        let skorCarpani = 1.0;  // Target boyutuna göre hesaplanacak
 
+        // YENİ: Target boyutunu ve skor çarpanını hesapla
+        function targetBoyutunuAlgilaVeSkorHesapla() {
+            return new Promise((resolve) => {
+                const testImg = new Image();
+                testImg.onload = function() {
+                    targetGercekGenislik = this.width;
+                    targetGercekYukseklik = this.height;
+                    
+                    // Skor çarpanını hesapla - küçük hedefler daha yüksek çarpan
+                    // Temel boyut: 298x83 (havuz) = 1.0x çarpan
+                    const temelAlan = 298 * 83; // 24734
+                    const targetAlan = targetGercekGenislik * targetGercekYukseklik;
+                    skorCarpani = Math.sqrt(temelAlan / targetAlan); // Küçük hedef = daha yüksek çarpan
+                    
+                    console.log(`🎯 Target boyutu algılandı: ${targetGercekGenislik}x${targetGercekYukseklik}`);
+                    console.log(`📊 Skor çarpanı: ${skorCarpani.toFixed(2)}x (Temel havuza göre)`);
+                    resolve();
+                };
+                testImg.onerror = function() {
+                    console.warn(`⚠️ Target resmi yüklenemedi, varsayılan boyutlar kullanılıyor`);
+                    resolve();
+                };
+                // PNG'yi dene, yoksa SVG
+                testImg.src = `${targetBaseName}.png`;
+            });
+        }
         
         function rastgeleHavuzKonumu() {
             const guncelGenislik = Math.max(window.innerWidth, document.documentElement.clientWidth) || 1920;
-            const havuzGenisligi = Math.round(298 * ortalamaOran);
-            const havuzYuksekligi = Math.round(83 * ortalamaOran);
+            const havuzGenisligi = Math.round(targetGercekGenislik * ortalamaOran);
+            const havuzYuksekligi = Math.round(targetGercekYukseklik * ortalamaOran);
             const guvenliMargin = Math.round(50 * ortalamaOran);
             const solSinir = guvenliMargin;
             const sagSinir = guncelGenislik - havuzGenisligi - guvenliMargin;
@@ -200,10 +234,13 @@
                 clearTimeout(havuzGizlemeTimer);
                 havuzGizlemeTimer = null;
             }
-            console.log(`Havuz konumu: x=${rastgeleX}`);
+            console.log(`Havuz konumu: x=${rastgeleX}, Boyut: ${havuzGenisligi}x${havuzYuksekligi}`);
         }
 
-        rastgeleHavuzKonumu();
+        // Target boyutunu algıla ve başlat
+        targetBoyutunuAlgilaVeSkorHesapla().then(() => {
+            rastgeleHavuzKonumu();
+        });
 
         function atlaAnimasyonunuBaslat(kullaniciAdi = 'Bilinmeyen', emojiId = null) {
             const aktifKarakterSayisi = document.querySelectorAll('.karakter').length;
@@ -334,6 +371,9 @@
             karakter.style.top = '0px';
             karakter.style.position = 'absolute';
             
+            // YENİ: Karakter için canvas oluştur (çarpışma tespiti için)
+            karakterIcinCanvasOlustur(kullaniciAdi, karakter, karakterGenisligi, karakterYuksekligi);
+            
             const guncelYukseklik = Math.max(window.innerHeight, document.documentElement.clientHeight) || 1080;
             const guvenliKarakterMargin = Math.round(20 * ortalamaOran);
             const minX = guvenliKarakterMargin;
@@ -445,6 +485,7 @@
                             karakter.style.opacity = '0';
                             kullaniciEtiketi.style.opacity = '0';
                             karakterPozisyonlari.delete(kullaniciAdi);
+                            karakterCanvaslari.delete(kullaniciAdi); // YENİ: Canvas'ı temizle
                             setTimeout(() => {
                                 if (karakter.parentNode) karakter.parentNode.removeChild(karakter);
                                 if (kullaniciEtiketi.parentNode) kullaniciEtiketi.parentNode.removeChild(kullaniciEtiketi);
@@ -638,21 +679,30 @@
                         const puanlamaKatsayisi = AYARLAR.puanlama.puanlamaKatsayisi * ortalamaOran;
                         if (mesafe < basariMesafeSiniri) {
                             basariliAtlayis = true;
-                            const puan = Math.max(0, Math.min(100, Math.round((basariMesafeSiniri - mesafe) / puanlamaKatsayisi)));
-                            console.log(`🏆 HAVUZ TUTTURULDU! ${kullaniciAdi} - Puan: ${puan}, Mesafe: ${mesafe.toFixed(1)}`);
+                            // YENİ: Target boyutuna göre skor çarpanı uygula
+                            const temelPuan = Math.max(0, Math.min(100, Math.round((basariMesafeSiniri - mesafe) / puanlamaKatsayisi)));
+                            const puan = Math.round(temelPuan * skorCarpani);
+                            const finalPuan = Math.min(100, puan); // 100'ü aşmasın
                             
-                            const skorMesaji = `Tebrikler @${kullaniciAdi}! Havuzu ${puan.toFixed(0)} puanla tutturdun!`;
+                            let zorlukBilgisi = '';
+                            if (skorCarpani > 1.1) {
+                                zorlukBilgisi = ` (${skorCarpani.toFixed(1)}x zorluk bonusu!)`;
+                            }
+                            
+                            console.log(`🏆 HAVUZ TUTTURULDU! ${kullaniciAdi} - Puan: ${finalPuan}, Mesafe: ${mesafe.toFixed(1)}, Çarpan: ${skorCarpani.toFixed(2)}x`);
+                            
+                            const skorMesaji = `Tebrikler @${kullaniciAdi}! Havuzu ${finalPuan.toFixed(0)} puanla tutturdun!${zorlukBilgisi}`;
                             sendChatMessageToKick(skorMesaji);
                             
-                            sonSkorlar.unshift({ username: kullaniciAdi, score: puan });
+                            sonSkorlar.unshift({ username: kullaniciAdi, score: finalPuan });
                             if (sonSkorlar.length > 10) {
                                 sonSkorlar.pop();
                             }
 
                             const mevcutEnIyi = enIyiSkorlarMap.get(kullaniciAdi) || 0;
-                            if (puan > mevcutEnIyi) {
-                                enIyiSkorlarMap.set(kullaniciAdi, puan);
-                                console.log(`🎉 YENİ KİŞİSEL REKOR! ${kullaniciAdi}: ${puan} puan`);
+                            if (finalPuan > mevcutEnIyi) {
+                                enIyiSkorlarMap.set(kullaniciAdi, finalPuan);
+                                console.log(`🎉 YENİ KİŞİSEL REKOR! ${kullaniciAdi}: ${finalPuan} puan`);
                             }
                             
                             let genelEnIyiSkor = 0;
@@ -678,6 +728,7 @@
                         karakter.style.opacity = '0';
                         kullaniciEtiketi.style.opacity = '0';
                         karakterPozisyonlari.delete(kullaniciAdi);
+                        karakterCanvaslari.delete(kullaniciAdi); // YENİ: Canvas'ı temizle
                         setTimeout(() => {
                             if (karakter.parentNode) karakter.parentNode.removeChild(karakter);
                             if (kullaniciEtiketi.parentNode) kullaniciEtiketi.parentNode.removeChild(kullaniciEtiketi);
@@ -696,6 +747,113 @@
             return { vx, vy };
         }
         
+        // YENİ: Karakter için canvas oluştur (pixel-perfect collision detection için)
+        function karakterIcinCanvasOlustur(kullaniciAdi, karakterElement, karakterGenisligi, karakterYuksekligi) {
+            const canvas = document.createElement('canvas');
+            canvas.width = Math.ceil(karakterGenisligi);
+            canvas.height = Math.ceil(karakterYuksekligi);
+            const ctx = canvas.getContext('2d', { willReadFrequently: true });
+            
+            // Karakterin background-image'ını al
+            const bgImage = karakterElement.style.backgroundImage;
+            // Birden fazla URL olabilir (svg ve png), son PNG'yi al
+            const urlMatches = bgImage.match(/url\(['"]?([^'"]+)['"]?\)/g);
+            
+            if (urlMatches && urlMatches.length > 0) {
+                // Son resmi tercih et (genellikle PNG)
+                const lastUrlMatch = urlMatches[urlMatches.length - 1];
+                const urlExtract = lastUrlMatch.match(/url\(['"]?([^'"]+)['"]?\)/);
+                
+                if (urlExtract && urlExtract[1]) {
+                    const img = new Image();
+                    img.crossOrigin = "anonymous"; // CORS için
+                    img.onload = function() {
+                        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+                        karakterCanvaslari.set(kullaniciAdi, {
+                            canvas: canvas,
+                            ctx: ctx,
+                            width: canvas.width,
+                            height: canvas.height
+                        });
+                        console.log(`🎨 Canvas oluşturuldu: ${kullaniciAdi} (${canvas.width}x${canvas.height})`);
+                    };
+                    img.onerror = function() {
+                        console.warn(`⚠️ Canvas için resim yüklenemedi: ${kullaniciAdi}, ilk URL deneniyor...`);
+                        // İlk URL'yi dene
+                        if (urlMatches.length > 1) {
+                            const firstUrlMatch = urlMatches[0];
+                            const firstUrlExtract = firstUrlMatch.match(/url\(['"]?([^'"]+)['"]?\)/);
+                            if (firstUrlExtract && firstUrlExtract[1]) {
+                                img.src = firstUrlExtract[1];
+                            }
+                        }
+                    };
+                    img.src = urlExtract[1];
+                }
+            }
+        }
+        
+        // YENİ: Canvas tabanlı hassas çarpışma tespiti
+        function canvasTabanliCarpisma(kullanici1, kullanici2, x1, y1, x2, y2) {
+            const canvas1 = karakterCanvaslari.get(kullanici1);
+            const canvas2 = karakterCanvaslari.get(kullanici2);
+            
+            // Canvas'lar henüz hazır değilse basit AABB kontrolü yap
+            if (!canvas1 || !canvas2) {
+                return false;
+            }
+            
+            // Çakışma bölgesini hesapla
+            const overlapLeft = Math.max(x1, x2);
+            const overlapTop = Math.max(y1, y2);
+            const overlapRight = Math.min(x1 + canvas1.width, x2 + canvas2.width);
+            const overlapBottom = Math.min(y1 + canvas1.height, y2 + canvas2.height);
+            
+            // Çakışma yoksa
+            if (overlapLeft >= overlapRight || overlapTop >= overlapBottom) {
+                return false;
+            }
+            
+            // Çakışma bölgesindeki pikselleri kontrol et
+            const overlapWidth = overlapRight - overlapLeft;
+            const overlapHeight = overlapBottom - overlapTop;
+            
+            // Performans için her 2. pikseli kontrol et
+            const step = 2;
+            
+            for (let oy = 0; oy < overlapHeight; oy += step) {
+                for (let ox = 0; ox < overlapWidth; ox += step) {
+                    // İlk karakterdeki pozisyon
+                    const px1 = overlapLeft - x1 + ox;
+                    const py1 = overlapTop - y1 + oy;
+                    
+                    // İkinci karakterdeki pozisyon
+                    const px2 = overlapLeft - x2 + ox;
+                    const py2 = overlapTop - y2 + oy;
+                    
+                    // Her iki pikselin alpha değerini kontrol et
+                    if (px1 >= 0 && px1 < canvas1.width && py1 >= 0 && py1 < canvas1.height &&
+                        px2 >= 0 && px2 < canvas2.width && py2 >= 0 && py2 < canvas2.height) {
+                        
+                        try {
+                            const imgData1 = canvas1.ctx.getImageData(px1, py1, 1, 1);
+                            const imgData2 = canvas2.ctx.getImageData(px2, py2, 1, 1);
+                            
+                            // Her iki piksel de opak mu? (alpha > 50)
+                            if (imgData1.data[3] > 50 && imgData2.data[3] > 50) {
+                                return true; // Çarpışma var!
+                            }
+                        } catch (e) {
+                            // getImageData hatası - muhtemelen CORS
+                            continue;
+                        }
+                    }
+                }
+            }
+            
+            return false; // Hiçbir piksel çakışması bulunamadı
+        }
+        
         function karakterCarpismaTespiti(mevcutKullanici, x, y, karakterGenisligi, karakterYuksekligi) {
             for (const [kullaniciAdi, pozisyon] of karakterPozisyonlari) {
                 if (kullaniciAdi === mevcutKullanici) continue;
@@ -707,8 +865,18 @@
                 
                 const digerGenislik = pozisyon.karakter.clientWidth;
                 const digerYukseklik = pozisyon.karakter.clientHeight;
-                if (x < digerX + digerGenislik && x + karakterGenisligi > digerX && y < digerY + digerYukseklik && y + karakterYuksekligi > digerY) {
-                    if (pozisyon.vx !== undefined && pozisyon.vy !== undefined) {
+                
+                // Önce basit AABB kontrolü (hızlı eleme)
+                if (x < digerX + digerGenislik && x + karakterGenisligi > digerX && 
+                    y < digerY + digerYukseklik && y + karakterYuksekligi > digerY) {
+                    
+                    // YENİ: Canvas tabanlı hassas kontrol
+                    const hassasCarpisma = canvasTabanliCarpisma(
+                        mevcutKullanici, kullaniciAdi, 
+                        x, y, digerX, digerY
+                    );
+                    
+                    if (hassasCarpisma && pozisyon.vx !== undefined && pozisyon.vy !== undefined) {
                         return { carpisma: true, digerKullanici: kullaniciAdi, digerPozisyon: pozisyon };
                     }
                 }
