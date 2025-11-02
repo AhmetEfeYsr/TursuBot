@@ -18,7 +18,7 @@
 <body>
     <div id="havuz"></div>
     
-    <audio id="atlama-sesi" preload="auto" style="display: none;">
+    <audio id="atlama-sesi" preload="metadata" style="display: none;">
         <source id="atlama-sesi-source" src="vada.mp3" type="audio/mpeg">
     </audio>
 
@@ -35,12 +35,12 @@
         const paramAuth = urlParams.get('auth');
         const paramToken = urlParams.get('token') || null;
         
-        // YENİ: char, target ve sound parametrelerini al
+        // char, target ve sound parametrelerini al
         const paramChar = urlParams.get('char');
         const paramTarget = urlParams.get('target');
         const paramSound = urlParams.get('sound');
 
-        // YENİ: Parametre yoksa varsayılan isimleri kullan
+        // Parametre yoksa varsayılan isimleri kullan
         const charBaseName = paramChar || 'karakter';
         const targetBaseName = paramTarget || 'havuz';
         const soundBaseName = paramSound || 'vada';
@@ -108,19 +108,28 @@
         const havuz = document.getElementById('havuz');
         const atlamaSesi = document.getElementById('atlama-sesi');
 
-        // YENİ: Ses kaynağını URL parametresine göre ayarla
+        // Ses kaynağını URL parametresine göre ayarla
         const atlamaSesiSource = document.getElementById('atlama-sesi-source');
         atlamaSesiSource.src = `${soundBaseName}.mp3`;
+        
+        // Ses yüklenme kontrolü
+        atlamaSesi.addEventListener('canplay', () => {
+            console.log('✅ Ses dosyası yüklendi ve oynatılmaya hazır');
+        });
+        atlamaSesi.addEventListener('error', (e) => {
+            console.error(`⚠️ Ses yüklenemedi: ${soundBaseName}.mp3`, e);
+        });
+        
         atlamaSesi.load(); // Sesi yeniden yükle
 
-        // YENİ: Havuzun resmini URL parametresine göre hemen ayarla
-        havuz.style.backgroundImage = `url('${targetBaseName}.svg'), url('${targetBaseName}.png')`;
+        // Havuzun resmini URL parametresine göre hemen ayarla
+        havuz.style.backgroundImage = `url('${targetBaseName}.png')`;
 
         const AYARLAR = {
             kickChatroomID: paramChannelId || 0, 
             kickApiToken: paramToken,
             kickApiChatUrl: `https://kick.com/api/v2/chatrooms/${paramChannelId}/messages`,
-            kickWebSocketUrl: "wss://ws-us2.pusher.com/app/32cbd69e4b950bf97679?protocol=7&client=js&version=7.6.0&flash=false", 
+            kickWebSocketUrl: "wss://ws-us2.pusher.com/app/eb1d5f283081a78b932c?protocol=7&client=js&version=7.6.0&flash=false", 
             yetkiliListesi: dynamicAuthorizedUsers, 
             
             sikeListesi: ["c", "b", "a"],
@@ -149,9 +158,9 @@
         if (AYARLAR.sikeListesi.length > 0) {
             console.warn(`🎯 Şike listesi aktif: ${AYARLAR.sikeListesi.join(', ')}`);
         }
-        // YENİ: Dinamik varlıkları konsola yazdır
-        console.log(`🎨 Karakter dosyası: ${charBaseName}.png / .svg`);
-        console.log(`🎯 Hedef dosyası: ${targetBaseName}.png / .svg`);
+        // Dinamik varlıkları konsola yazdır
+        console.log(`🎨 Karakter dosyası: ${charBaseName}.png`);
+        console.log(`🎯 Hedef dosyası: ${targetBaseName}.png`);
         console.log(`🔊 Ses dosyası: ${soundBaseName}.mp3`);
 
         const ekranGenisligi = Math.max(window.innerWidth, document.documentElement.clientWidth) || 1920;
@@ -332,6 +341,20 @@
             if (!karakterBulundu) {
                 karakter.style.backgroundImage = `url('${charBaseName}.png')`;
                 karakterGenisligi = Math.round(90 * ortalamaOran);
+            }
+            
+            // Karakter resminin yüklendiğini kontrol et
+            const karakterResimUrl = karakter.style.backgroundImage.match(/url\(['"]?([^'"]+)['"]?\)/);
+            if (karakterResimUrl && karakterResimUrl[1]) {
+                const testImg = new Image();
+                testImg.onload = () => {
+                    console.log(`✅ Karakter resmi yüklendi: ${karakterResimUrl[1]}`);
+                };
+                testImg.onerror = () => {
+                    console.error(`❌ Karakter resmi yüklenemedi: ${karakterResimUrl[1]}`);
+                    console.warn(`🔍 Dosyanın atla.html ile aynı klasörde olduğundan emin olun!`);
+                };
+                testImg.src = karakterResimUrl[1];
             }
             
             // Sadece genişlik ayarla, yükseklik otomatik olsun (en-boy oranı korunsun)
@@ -976,4 +999,3 @@
     </script>
     </body>
 </html>
-
