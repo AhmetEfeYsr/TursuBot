@@ -11,7 +11,7 @@
         html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background-color: transparent; font-family: 'Roboto', sans-serif; -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; text-rendering: optimizeSpeed; transform: translateZ(0); backface-visibility: hidden; image-rendering: optimizeSpeed; image-rendering: -webkit-optimize-contrast; image-rendering: crisp-edges; image-rendering: pixelated; }
         body { position: relative; min-width: 100vw; min-height: 100vh; }
         .karakter { width: 100px; height: auto; background-image: url('karakter.png'); background-size: contain; background-repeat: no-repeat; background-position: center; position: absolute; top: -150px; left: -150px; opacity: 0; z-index: 10; transition: opacity 0.3s ease; will-change: transform; transform: translateZ(0); }
-        #havuz { width: 298px; height: auto; background-image: url('havuz.svg'), url('havuz.png'); background-size: contain; background-repeat: no-repeat; background-position: center; position: absolute; bottom: 0; left: 50%; transform: translateX(-50%) translateZ(0); box-sizing: border-box; transition: opacity 0.5s ease; z-index: 5; will-change: transform, opacity; backface-visibility: hidden; image-rendering: optimizeSpeed; image-rendering: crisp-edges; }
+        #havuz { width: 300px; height: auto; background-image: url('havuz.png'); background-size: contain; background-repeat: no-repeat; background-position: center; position: absolute; bottom: 0; left: 50%; transform: translateX(-50%) translateZ(0); box-sizing: border-box; transition: opacity 0.5s ease; z-index: 5; will-change: transform, opacity; backface-visibility: hidden; image-rendering: optimizeSpeed; image-rendering: crisp-edges; }
     </style>
     </head>
 
@@ -120,7 +120,7 @@
             kickChatroomID: paramChannelId || 0, 
             kickApiToken: paramToken,
             kickApiChatUrl: `https://kick.com/api/v2/chatrooms/${paramChannelId}/messages`,
-            kickWebSocketUrl: "wss://ws-us2.pusher.com/app/32cbd69e4b950bf97679?protocol=7&client=js&version=7.6.0&flash=false", 
+            kickWebSocketUrl: "wss://ws-us2.pusher.com/app/eb1d5f283081a78b932c?protocol=7&client=js&version=7.6.0&flash=false", 
             yetkiliListesi: dynamicAuthorizedUsers, 
             
             sikeListesi: ["c", "b", "a"],
@@ -177,15 +177,11 @@
         let enIyiSkorlarMap = new Map();
         let sonSkorlar = [];
         
-        // YENİ: Canvas tabanlı çarpışma tespiti için
-        let karakterCanvaslari = new Map(); // Her karakter için canvas tutar
-        
-        // YENİ: Target boyutu ve skorlama çarpanı
-        let targetGercekGenislik = 298;  // Varsayılan havuz genişliği
+        // Target boyutu ve skorlama
+        let targetGercekGenislik = 300;  // Varsayılan havuz genişliği
         let targetGercekYukseklik = 83;  // Varsayılan havuz yüksekliği
-        let skorCarpani = 1.0;  // Target boyutuna göre hesaplanacak
 
-        // YENİ: Target boyutunu ve skor çarpanını hesapla
+        // Target boyutunu algıla ve dinamik puanlama hesapla
         function targetBoyutunuAlgilaVeSkorHesapla() {
             return new Promise((resolve) => {
                 const testImg = new Image();
@@ -193,20 +189,13 @@
                     targetGercekGenislik = this.width;
                     targetGercekYukseklik = this.height;
                     
-                    // Skor çarpanını hesapla - küçük hedefler daha yüksek çarpan
-                    // Temel boyut: 298x83 (havuz) = 1.0x çarpan
-                    const temelAlan = 298 * 83; // 24734
-                    const targetAlan = targetGercekGenislik * targetGercekYukseklik;
-                    skorCarpani = Math.sqrt(temelAlan / targetAlan); // Küçük hedef = daha yüksek çarpan
-                    
-                    // YENİ: Dinamik puanlama hesaplaması
+                    // Dinamik puanlama hesaplaması
                     // basariMesafeSiniri = hedefin genişliğinin yarısı
                     AYARLAR.puanlama.basariMesafeSiniri = targetGercekGenislik / 2;
                     // puanlamaKatsayisi = basariMesafeSiniri'nin %1'i
                     AYARLAR.puanlama.puanlamaKatsayisi = AYARLAR.puanlama.basariMesafeSiniri * 0.01;
                     
                     console.log(`🎯 Target boyutu algılandı: ${targetGercekGenislik}x${targetGercekYukseklik}`);
-                    console.log(`📊 Skor çarpanı: ${skorCarpani.toFixed(2)}x (Temel havuza göre)`);
                     console.log(`📏 Başarı mesafe sınırı: ${AYARLAR.puanlama.basariMesafeSiniri.toFixed(1)} piksel (Target genişliği / 2)`);
                     console.log(`📐 Puanlama katsayısı: ${AYARLAR.puanlama.puanlamaKatsayisi.toFixed(3)} (Başarı sınırının %1'i)`);
                     resolve();
@@ -218,7 +207,6 @@
                     AYARLAR.puanlama.puanlamaKatsayisi = AYARLAR.puanlama.basariMesafeSiniri * 0.01;
                     resolve();
                 };
-                // PNG'yi dene, yoksa SVG
                 testImg.src = `${targetBaseName}.png`;
             });
         }
@@ -236,11 +224,11 @@
             havuz.style.transform = 'none';
             havuz.style.opacity = '1';
             havuz.style.width = havuzGenisligi + 'px';
-            havuz.style.height = 'auto'; // YENİ: Yükseklik otomatik (en-boy oranı korunsun)
+            havuz.style.height = 'auto'; // Yükseklik otomatik (en-boy oranı korunsun)
             
-            // YENİ: Havuz resmini ve boyutunu tekrar ayarla
-            havuz.style.backgroundImage = `url('${targetBaseName}.svg'), url('${targetBaseName}.png')`;
-            havuz.style.backgroundSize = 'contain'; // YENİ: Resim oranı korunsun
+            // Havuz resmini ayarla
+            havuz.style.backgroundImage = `url('${targetBaseName}.png')`;
+            havuz.style.backgroundSize = 'contain'; // Resim oranı korunsun
 
             havuzGizli = false;
             atlayanKullanicilar.clear();
@@ -315,12 +303,12 @@
             // 2. ÖNCELİK: Özel kullanıcılar
             if (!karakterBulundu) { 
                 if (normalizedUsername === 'pairaaa') {
-                    karakter.style.backgroundImage = "url('pairaaa.svg'), url('pairaaa.png')";
+                    karakter.style.backgroundImage = "url('pairaaa.png')";
                     karakterGenisligi = Math.round(90 * ortalamaOran);
                     console.log(`🌟 ${kullaniciAdi} - Özel karakter kullanılıyor!`);
                     karakterBulundu = true;
                 } else if (normalizedUsername === 'himilayk') {
-                    karakter.style.backgroundImage = "url('himilayk.svg'), url('himilayk.png')";
+                    karakter.style.backgroundImage = "url('himilayk.png')";
                     karakterGenisligi = Math.round(90 * ortalamaOran);
                     console.log(`🌟 ${kullaniciAdi} - Özel karakter kullanılıyor!`);
                     karakterBulundu = true;
@@ -342,14 +330,14 @@
             }
 
             if (!karakterBulundu) {
-                karakter.style.backgroundImage = `url('${charBaseName}.svg'), url('${charBaseName}.png')`;
+                karakter.style.backgroundImage = `url('${charBaseName}.png')`;
                 karakterGenisligi = Math.round(90 * ortalamaOran);
             }
             
-            // YENİ: Sadece genişlik ayarla, yükseklik otomatik olsun (en-boy oranı korunsun)
+            // Sadece genişlik ayarla, yükseklik otomatik olsun (en-boy oranı korunsun)
             karakter.style.width = karakterGenisligi + 'px';
             karakter.style.height = 'auto';
-            karakter.style.backgroundSize = 'contain'; // YENİ: Resim oranı korunsun
+            karakter.style.backgroundSize = 'contain'; // Resim oranı korunsun
             karakter.style.backgroundRepeat = 'no-repeat';
             karakter.style.backgroundPosition = 'center';
             karakter.style.position = 'absolute';
@@ -385,17 +373,7 @@
             karakter.style.top = '0px';
             karakter.style.position = 'absolute';
             
-            // YENİ: DOM'dan gerçek yüksekliği al (en-boy oranı korunmuş haliyle)
-            // Tarayıcıya render için zaman ver
-            setTimeout(() => {
-                const karakterYuksekligi = karakter.offsetHeight || Math.round(108 * ortalamaOran); // Fallback
-                console.log(`📐 Karakter boyutu: ${karakterGenisligi}x${karakterYuksekligi} (oran korundu)`);
-                
-                // YENİ: Karakter için canvas oluştur (çarpışma tespiti için)
-                karakterIcinCanvasOlustur(kullaniciAdi, karakter, karakterGenisligi, karakterYuksekligi);
-            }, 10);
-            
-            // Geçici yükseklik değeri (gerçek değer birazdan alınacak)
+            // Geçici yükseklik değeri (gerçek değer animasyonda alınacak)
             let karakterYuksekligi = Math.round(108 * ortalamaOran);
             
             const guncelYukseklik = Math.max(window.innerHeight, document.documentElement.clientHeight) || 1080;
@@ -412,7 +390,7 @@
                 const A = { x: baslangicX, y: y };
 
                 const havuzLeft = parseInt(havuz.style.left) || 0;
-                const havuzWidth = parseInt(havuz.style.width) || 298;
+                const havuzWidth = parseInt(havuz.style.width) || 300;
                 const targetX = havuzLeft + (havuzWidth / 2) - (karakterGenisligi / 2);
                 const targetY = guncelYukseklik - karakterYuksekligi;
                 const B = { x: targetX, y: targetY };
@@ -452,10 +430,7 @@
                 
                 const sikeAnimasyon = (mevcutZaman) => {
                     const mevcutPozisyon = karakterPozisyonlari.get(kullaniciAdi);
-                    if (!mevcutPozisyon) return;
-                    
-                    // YENİ: Gerçek yüksekliği DOM'dan al (en-boy oranı korunmuş)
-                    karakterYuksekligi = karakter.offsetHeight || karakterYuksekligi; 
+                    if (!mevcutPozisyon) return; 
 
                     const gecenSure = mevcutZaman - baslangicZamani;
                     let t = Math.min(gecenSure / sikeAtlamaSuresi, 1.0);
@@ -512,7 +487,6 @@
                             karakter.style.opacity = '0';
                             kullaniciEtiketi.style.opacity = '0';
                             karakterPozisyonlari.delete(kullaniciAdi);
-                            karakterCanvaslari.delete(kullaniciAdi); // YENİ: Canvas'ı temizle
                             setTimeout(() => {
                                 if (karakter.parentNode) karakter.parentNode.removeChild(karakter);
                                 if (kullaniciEtiketi.parentNode) kullaniciEtiketi.parentNode.removeChild(kullaniciEtiketi);
@@ -570,7 +544,7 @@
                     return;
                 }
                 
-                // YENİ: Gerçek yüksekliği DOM'dan al (en-boy oranı korunmuş)
+                // Gerçek yüksekliği DOM'dan al (en-boy oranı korunmuş)
                 karakterYuksekligi = karakter.offsetHeight || karakterYuksekligi;
                 
                 x = mevcutPozisyon.x;
@@ -759,7 +733,6 @@
                         karakter.style.opacity = '0';
                         kullaniciEtiketi.style.opacity = '0';
                         karakterPozisyonlari.delete(kullaniciAdi);
-                        karakterCanvaslari.delete(kullaniciAdi); // YENİ: Canvas'ı temizle
                         setTimeout(() => {
                             if (karakter.parentNode) karakter.parentNode.removeChild(karakter);
                             if (kullaniciEtiketi.parentNode) kullaniciEtiketi.parentNode.removeChild(kullaniciEtiketi);
@@ -778,113 +751,7 @@
             return { vx, vy };
         }
         
-        // YENİ: Karakter için canvas oluştur (pixel-perfect collision detection için)
-        function karakterIcinCanvasOlustur(kullaniciAdi, karakterElement, karakterGenisligi, karakterYuksekligi) {
-            const canvas = document.createElement('canvas');
-            canvas.width = Math.ceil(karakterGenisligi);
-            canvas.height = Math.ceil(karakterYuksekligi);
-            const ctx = canvas.getContext('2d', { willReadFrequently: true });
-            
-            // Karakterin background-image'ını al
-            const bgImage = karakterElement.style.backgroundImage;
-            // Birden fazla URL olabilir (svg ve png), son PNG'yi al
-            const urlMatches = bgImage.match(/url\(['"]?([^'"]+)['"]?\)/g);
-            
-            if (urlMatches && urlMatches.length > 0) {
-                // Son resmi tercih et (genellikle PNG)
-                const lastUrlMatch = urlMatches[urlMatches.length - 1];
-                const urlExtract = lastUrlMatch.match(/url\(['"]?([^'"]+)['"]?\)/);
-                
-                if (urlExtract && urlExtract[1]) {
-                    const img = new Image();
-                    img.crossOrigin = "anonymous"; // CORS için
-                    img.onload = function() {
-                        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-                        karakterCanvaslari.set(kullaniciAdi, {
-                            canvas: canvas,
-                            ctx: ctx,
-                            width: canvas.width,
-                            height: canvas.height
-                        });
-                        console.log(`🎨 Canvas oluşturuldu: ${kullaniciAdi} (${canvas.width}x${canvas.height})`);
-                    };
-                    img.onerror = function() {
-                        console.warn(`⚠️ Canvas için resim yüklenemedi: ${kullaniciAdi}, ilk URL deneniyor...`);
-                        // İlk URL'yi dene
-                        if (urlMatches.length > 1) {
-                            const firstUrlMatch = urlMatches[0];
-                            const firstUrlExtract = firstUrlMatch.match(/url\(['"]?([^'"]+)['"]?\)/);
-                            if (firstUrlExtract && firstUrlExtract[1]) {
-                                img.src = firstUrlExtract[1];
-                            }
-                        }
-                    };
-                    img.src = urlExtract[1];
-                }
-            }
-        }
-        
-        // YENİ: Canvas tabanlı hassas çarpışma tespiti
-        function canvasTabanliCarpisma(kullanici1, kullanici2, x1, y1, x2, y2) {
-            const canvas1 = karakterCanvaslari.get(kullanici1);
-            const canvas2 = karakterCanvaslari.get(kullanici2);
-            
-            // Canvas'lar henüz hazır değilse basit AABB kontrolü yap
-            if (!canvas1 || !canvas2) {
-                return false;
-            }
-            
-            // Çakışma bölgesini hesapla
-            const overlapLeft = Math.max(x1, x2);
-            const overlapTop = Math.max(y1, y2);
-            const overlapRight = Math.min(x1 + canvas1.width, x2 + canvas2.width);
-            const overlapBottom = Math.min(y1 + canvas1.height, y2 + canvas2.height);
-            
-            // Çakışma yoksa
-            if (overlapLeft >= overlapRight || overlapTop >= overlapBottom) {
-                return false;
-            }
-            
-            // Çakışma bölgesindeki pikselleri kontrol et
-            const overlapWidth = overlapRight - overlapLeft;
-            const overlapHeight = overlapBottom - overlapTop;
-            
-            // Performans için her 2. pikseli kontrol et
-            const step = 2;
-            
-            for (let oy = 0; oy < overlapHeight; oy += step) {
-                for (let ox = 0; ox < overlapWidth; ox += step) {
-                    // İlk karakterdeki pozisyon
-                    const px1 = overlapLeft - x1 + ox;
-                    const py1 = overlapTop - y1 + oy;
-                    
-                    // İkinci karakterdeki pozisyon
-                    const px2 = overlapLeft - x2 + ox;
-                    const py2 = overlapTop - y2 + oy;
-                    
-                    // Her iki pikselin alpha değerini kontrol et
-                    if (px1 >= 0 && px1 < canvas1.width && py1 >= 0 && py1 < canvas1.height &&
-                        px2 >= 0 && px2 < canvas2.width && py2 >= 0 && py2 < canvas2.height) {
-                        
-                        try {
-                            const imgData1 = canvas1.ctx.getImageData(px1, py1, 1, 1);
-                            const imgData2 = canvas2.ctx.getImageData(px2, py2, 1, 1);
-                            
-                            // Her iki piksel de opak mu? (alpha > 50)
-                            if (imgData1.data[3] > 50 && imgData2.data[3] > 50) {
-                                return true; // Çarpışma var!
-                            }
-                        } catch (e) {
-                            // getImageData hatası - muhtemelen CORS
-                            continue;
-                        }
-                    }
-                }
-            }
-            
-            return false; // Hiçbir piksel çakışması bulunamadı
-        }
-        
+        // Basit dikdörtgen çarpışma tespiti (AABB)
         function karakterCarpismaTespiti(mevcutKullanici, x, y, karakterGenisligi, karakterYuksekligi) {
             for (const [kullaniciAdi, pozisyon] of karakterPozisyonlari) {
                 if (kullaniciAdi === mevcutKullanici) continue;
@@ -897,17 +764,11 @@
                 const digerGenislik = pozisyon.karakter.clientWidth;
                 const digerYukseklik = pozisyon.karakter.clientHeight;
                 
-                // Önce basit AABB kontrolü (hızlı eleme)
+                // Basit AABB (dikdörtgen) çarpışma kontrolü
                 if (x < digerX + digerGenislik && x + karakterGenisligi > digerX && 
                     y < digerY + digerYukseklik && y + karakterYuksekligi > digerY) {
                     
-                    // YENİ: Canvas tabanlı hassas kontrol
-                    const hassasCarpisma = canvasTabanliCarpisma(
-                        mevcutKullanici, kullaniciAdi, 
-                        x, y, digerX, digerY
-                    );
-                    
-                    if (hassasCarpisma && pozisyon.vx !== undefined && pozisyon.vy !== undefined) {
+                    if (pozisyon.vx !== undefined && pozisyon.vy !== undefined) {
                         return { carpisma: true, digerKullanici: kullaniciAdi, digerPozisyon: pozisyon };
                     }
                 }
@@ -1115,4 +976,3 @@
     </script>
     </body>
 </html>
-
