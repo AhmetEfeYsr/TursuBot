@@ -239,16 +239,23 @@
             const gercekSolSinir = Math.min(solSinir, sagSinir);
             const gercekSagSinir = Math.max(solSinir, sagSinir);
             const rastgeleX = Math.random() * (gercekSagSinir - gercekSolSinir) + gercekSolSinir;
+            const havuzYuksekligi = Math.round(targetGercekYukseklik * ortalamaOran);
             havuz.style.left = rastgeleX + 'px';
+            havuz.style.bottom = '0px';
+            havuz.style.top = 'auto'; // CSS'deki top değerini override et
             havuz.style.transform = 'none';
             havuz.style.opacity = '1';
-            havuz.style.bottom = '0px';
             havuz.style.width = havuzGenisligi + 'px';
-            // aspect-ratio CSS'de tanımlı, yükseklik otomatik hesaplanacak
+            havuz.style.height = havuzYuksekligi + 'px';
+            havuz.style.aspectRatio = 'unset'; // CSS aspect-ratio'yu override et, yükseklik manuel ayarlanıyor
+            havuz.style.margin = '0'; // Margin'leri sıfırla
+            havuz.style.padding = '0'; // Padding'leri sıfırla
             
             // Havuz resmini ayarla
             havuz.style.backgroundImage = `url('${targetBaseName}.png')`;
             havuz.style.backgroundSize = 'contain'; // Resim oranı korunsun
+            havuz.style.backgroundPosition = 'bottom center'; // Resmin altını container'ın altına hizala
+            havuz.style.backgroundRepeat = 'no-repeat'; // Resmin tekrarını önle
 
             havuzGizli = false;
             atlayanKullanicilar.clear();
@@ -1185,4 +1192,3 @@
     </script>
     </body>
 </html>
-
