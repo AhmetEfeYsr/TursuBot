@@ -10,8 +10,8 @@
         @import url('https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap');
         html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background-color: transparent; font-family: 'Roboto', sans-serif; -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; text-rendering: optimizeSpeed; transform: translateZ(0); backface-visibility: hidden; image-rendering: optimizeSpeed; image-rendering: -webkit-optimize-contrast; image-rendering: crisp-edges; image-rendering: pixelated; }
         body { position: relative; min-width: 100vw; min-height: 100vh; }
-        .karakter { width: 100px; height: auto; background-image: url('karakter.png'); background-size: contain; background-repeat: no-repeat; background-position: center; position: absolute; top: -150px; left: -150px; opacity: 0; z-index: 10; transition: opacity 0.3s ease; will-change: transform; transform: translateZ(0); }
-        #havuz { width: 300px; height: auto; background-image: url('havuz.png'); background-size: contain; background-repeat: no-repeat; background-position: center; position: absolute; bottom: 0; left: 50%; transform: translateX(-50%) translateZ(0); box-sizing: border-box; transition: opacity 0.5s ease; z-index: 5; will-change: transform, opacity; backface-visibility: hidden; image-rendering: optimizeSpeed; image-rendering: crisp-edges; }
+        .karakter { width: 100px; aspect-ratio: 1; background-image: url('karakter.png'); background-size: contain; background-repeat: no-repeat; background-position: center; position: absolute; top: -150px; left: -150px; opacity: 0; z-index: 10; transition: opacity 0.3s ease; will-change: transform; transform: translateZ(0); }
+        #havuz { width: 300px; aspect-ratio: 2.16; background-image: url('havuz.png'); background-size: contain; background-repeat: no-repeat; background-position: center; position: absolute; bottom: 0; left: 50%; transform: translateX(-50%) translateZ(0); box-sizing: border-box; transition: opacity 0.5s ease; z-index: 5; will-change: transform, opacity; backface-visibility: hidden; image-rendering: optimizeSpeed; image-rendering: crisp-edges; }
     </style>
     </head>
 
@@ -27,13 +27,25 @@
 
         const SECRET_KEY = "CokGizliAnahtarim123"; 
 
+        // Python OAuth Proxy WebSocket Bağlantısı
+        let proxyWs = null;
+        let proxyConnected = false;
+        let tokenValid = false;
+        
         const urlParams = new URLSearchParams(window.location.search);
+        
+        // Proxy URL'i (değiştirilebilir)
+        // Lokal kullanım: ws://localhost:8765
+        // Uzak sunucu: ws://SUNUCU_IP:8765
+        const PROXY_URL = urlParams.get('proxy') || "ws://localhost:8765";
+        
+        console.log(`🔌 Proxy URL: ${PROXY_URL}`);
         
         const paramLicense = urlParams.get('license');
         const paramUserId = urlParams.get('id');
         const paramChannelId = urlParams.get('channelid');
         const paramAuth = urlParams.get('auth');
-        const paramToken = urlParams.get('token') || null;
+        // OAuth kullanıldığı için token parametresi artık gerekli değil
         
         // char, target ve sound parametrelerini al
         const paramChar = urlParams.get('char');
@@ -127,8 +139,7 @@
 
         const AYARLAR = {
             kickChatroomID: paramChannelId || 0, 
-            kickApiToken: paramToken,
-            kickApiChatUrl: `https://kick.com/api/v2/chatrooms/${paramChannelId}/messages`,
+            // OAuth kullanıldığı için kickApiToken artık Python proxy tarafında yönetiliyor
             kickWebSocketUrl: "wss://ws-us2.pusher.com/app/32cbd69e4b950bf97679?protocol=7&client=js&version=7.6.0&flash=false", 
             yetkiliListesi: dynamicAuthorizedUsers, 
             
@@ -149,11 +160,7 @@
             }
         };
 
-        if (AYARLAR.kickApiToken) {
-            console.log("✅ Kick API token'ı bulundu. Skor mesajları gönderilecek.");
-        } else {
-            console.log("ℹ️ Kick API token'ı bulunamadı (isteğe bağlı). Skor mesajları gönderilmeyecek.");
-        }
+        console.log("ℹ️ Kick OAuth 2.1 kullanılıyor. Token otomatik yönetiliyor.");
         console.log(`🔒 Yetkili kullanıcılar: ${AYARLAR.yetkiliListesi.join(', ') || 'Hiçbiri'}`);
         if (AYARLAR.sikeListesi.length > 0) {
             console.warn(`🎯 Şike listesi aktif: ${AYARLAR.sikeListesi.join(', ')}`);
@@ -205,17 +212,20 @@
                     AYARLAR.puanlama.puanlamaKatsayisi = AYARLAR.puanlama.basariMesafeSiniri * 0.01;
                     
                     console.log(`🎯 Target boyutu algılandı: ${targetGercekGenislik}x${targetGercekYukseklik}`);
+                    console.log(`✅ Target resmi başarıyla yüklendi: ${targetBaseName}.png`);
                     console.log(`📏 Başarı mesafe sınırı: ${AYARLAR.puanlama.basariMesafeSiniri.toFixed(1)} piksel (Target genişliği / 2)`);
                     console.log(`📐 Puanlama katsayısı: ${AYARLAR.puanlama.puanlamaKatsayisi.toFixed(3)} (Başarı sınırının %1'i)`);
                     resolve();
                 };
                 testImg.onerror = function() {
-                    console.warn(`⚠️ Target resmi yüklenemedi, varsayılan boyutlar kullanılıyor`);
+                    console.error(`❌ Target resmi yüklenemedi: ${targetBaseName}.png`);
+                    console.warn(`⚠️ Varsayılan boyutlar kullanılıyor`);
                     // Varsayılan değerlerle de hesapla
                     AYARLAR.puanlama.basariMesafeSiniri = targetGercekGenislik / 2;
                     AYARLAR.puanlama.puanlamaKatsayisi = AYARLAR.puanlama.basariMesafeSiniri * 0.01;
                     resolve();
                 };
+                console.log(`🔍 Target resmi yükleniyor: ${targetBaseName}.png`);
                 testImg.src = `${targetBaseName}.png`;
             });
         }
@@ -233,7 +243,7 @@
             havuz.style.transform = 'none';
             havuz.style.opacity = '1';
             havuz.style.width = havuzGenisligi + 'px';
-            havuz.style.height = 'auto'; // Yükseklik otomatik (en-boy oranı korunsun)
+            // aspect-ratio CSS'de tanımlı, yükseklik otomatik hesaplanacak
             
             // Havuz resmini ayarla
             havuz.style.backgroundImage = `url('${targetBaseName}.png')`;
@@ -246,10 +256,13 @@
                 havuzGizlemeTimer = null;
             }
             
-            // Gerçek yüksekliği DOM'dan al
+            // Gerçek yüksekliği DOM'dan al ve debug bilgisi ver
             setTimeout(() => {
                 const gercekYukseklik = havuz.offsetHeight || Math.round(targetGercekYukseklik * ortalamaOran);
-                console.log(`Havuz konumu: x=${rastgeleX}, Boyut: ${havuzGenisligi}x${gercekYukseklik} (oran korundu)`);
+                console.log(`🏊 Havuz konumu: x=${rastgeleX}, Boyut: ${havuzGenisligi}x${gercekYukseklik}`);
+                console.log(`🎨 Havuz background: ${havuz.style.backgroundImage}`);
+                console.log(`👁️ Havuz opacity: ${havuz.style.opacity}, display: ${getComputedStyle(havuz).display}`);
+                console.log(`📍 Havuz position: left=${havuz.style.left}, bottom=${havuz.style.bottom}`);
             }, 50);
         }
 
@@ -322,6 +335,12 @@
                     console.log(`🌟 ${kullaniciAdi} - Özel karakter kullanılıyor!`);
                     karakterBulundu = true;
                 }
+                else if (normalizedUsername === 'selcukinan') {
+                    karakter.style.backgroundImage = "url('çay.png')";
+                    karakterGenisligi = Math.round(90 * ortalamaOran);
+                    console.log(`🌟 ${kullaniciAdi} - Özel karakter kullanılıyor!`);
+                    karakterBulundu = true;
+                }
             }
 
             // 3. ÖNCELİK: Gruplar
@@ -357,9 +376,9 @@
                 testImg.src = karakterResimUrl[1];
             }
             
-            // Sadece genişlik ayarla, yükseklik otomatik olsun (en-boy oranı korunsun)
+            // Sadece genişlik ayarla, aspect-ratio'dan yükseklik hesaplanacak
             karakter.style.width = karakterGenisligi + 'px';
-            karakter.style.height = 'auto';
+            // aspect-ratio CSS'de tanımlı (1:1 varsayılan)
             karakter.style.backgroundSize = 'contain'; // Resim oranı korunsun
             karakter.style.backgroundRepeat = 'no-repeat';
             karakter.style.backgroundPosition = 'center';
@@ -396,8 +415,8 @@
             karakter.style.top = '0px';
             karakter.style.position = 'absolute';
             
-            // Geçici yükseklik değeri (gerçek değer animasyonda alınacak)
-            let karakterYuksekligi = Math.round(108 * ortalamaOran);
+            // Yükseklik aspect-ratio'dan hesaplanacak (1:1 için genişlik = yükseklik)
+            let karakterYuksekligi = karakterGenisligi; // aspect-ratio: 1 olduğu için
             
             const guncelYukseklik = Math.max(window.innerHeight, document.documentElement.clientHeight) || 1080;
             const guvenliKarakterMargin = Math.round(20 * ortalamaOran);
@@ -566,9 +585,6 @@
                 if (!mevcutPozisyon) {
                     return;
                 }
-                
-                // Gerçek yüksekliği DOM'dan al (en-boy oranı korunmuş)
-                karakterYuksekligi = karakter.offsetHeight || karakterYuksekligi;
                 
                 x = mevcutPozisyon.x;
                 y = mevcutPozisyon.y;
@@ -800,37 +816,24 @@
         }
         
         async function sendChatMessageToKick(mesaj) {
-            if (!AYARLAR.kickApiToken || !AYARLAR.kickChatroomID || !mesaj) {
+            if (!mesaj) {
                 return;
             }
-
-            try {
-                const response = await fetch(AYARLAR.kickApiChatUrl, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Authorization': `Bearer ${AYARLAR.kickApiToken}`,
-                        'Accept': 'application/json'
-                    },
-                    body: JSON.stringify({
-                        'content': mesaj,
-                        'type': 'message'
-                    })
-                });
-
-                if (response.ok) {
-                    console.log(`📤 Kick Chat'e mesaj gönderildi: ${mesaj}`);
-                } else if (response.status === 401 || response.status === 403) {
-                    console.error(`🛑 Kick API token'ı geçersiz veya süresi dolmuş. (Hata: ${response.status})`);
-                    console.warn("Mesaj gönderme özelliği bu oturum için devre dışı bırakıldı.");
-                    AYARLAR.kickApiToken = null;
-                } else {
-                    console.error(`Kick API'sine mesaj gönderilemedi. Hata: ${response.status}`, await response.json());
+            
+            // Python Proxy üzerinden gönder
+            if (proxyConnected && proxyWs && proxyWs.readyState === WebSocket.OPEN) {
+                try {
+                    const request = {
+                        action: 'send_message',
+                        message: mesaj
+                    };
+                    proxyWs.send(JSON.stringify(request));
+                    console.log(`📤 Proxy'ye mesaj gönderildi: ${mesaj}`);
+                } catch (error) {
+                    console.error("Proxy'ye mesaj gönderirken hata:", error);
                 }
-            } catch (error) {
-                console.error("Kick API'sine bağlanırken ağ hatası:", error);
-                console.warn("Mesaj gönderme özelliği bu oturum için devre dışı bırakıldı.");
-                AYARLAR.kickApiToken = null;
+            } else {
+                console.warn("⚠️ Proxy bağlantısı yok. Mesaj gönderilemedi:", mesaj);
             }
         }
         
@@ -843,6 +846,124 @@
             console.log(`▶️ Sıradan işletiliyor: ${atlayacakKisi.username} (Kalan: ${atlamaSirasi.length})`);
             atlaAnimasyonunuBaslat(atlayacakKisi.username, atlayacakKisi.emojiId);
             setTimeout(siraIslet, AYARLAR.topluAtlamaGecikmesi);
+        }
+
+        function updateOAuthStatus(message, color = '#C8A2C8') {
+            // Durum göstergesi kaldırıldı
+        }
+        
+        function connectToProxyServer() {
+            console.log(`🔌 OAuth Proxy'ye bağlanılıyor: ${PROXY_URL}`);
+            updateOAuthStatus('🔌 Proxy\'ye bağlanıyor...');
+            
+            try {
+                proxyWs = new WebSocket(PROXY_URL);
+                
+                proxyWs.onopen = () => {
+                    console.log("✅ OAuth Proxy'ye başarıyla bağlanıldı!");
+                    proxyConnected = true;
+                    updateOAuthStatus('✅ Bağlandı', '#90EE90');
+                    
+                    // Chatroom ID'yi gönder
+                    if (AYARLAR.kickChatroomID) {
+                        const chatroomData = {
+                            action: 'set_chatroom',
+                            chatroom_id: AYARLAR.kickChatroomID
+                        };
+                        proxyWs.send(JSON.stringify(chatroomData));
+                    }
+                    
+                    // Durum kontrolü yap
+                    proxyWs.send(JSON.stringify({ action: 'check_status' }));
+                };
+                
+                proxyWs.onmessage = (event) => {
+                    try {
+                        const data = JSON.parse(event.data);
+                        
+                        if (data.action === 'connected') {
+                            tokenValid = data.token_valid;
+                            console.log(`📊 Bağlantı durumu - Token geçerli: ${data.token_valid}`);
+                            console.log(`⏱️  Kalan süre: ${data.remaining_time}`);
+                            
+                            if (data.token_valid) {
+                                updateOAuthStatus(`✅ Token aktif<br>⏱️ ${data.remaining_time}`, '#90EE90');
+                            } else if (data.has_refresh_token) {
+                                updateOAuthStatus('🔄 Token yenileniyor...', '#FFA500');
+                            } else {
+                                // Otomatik yetkilendirme kontrolü
+                                const autoAuth = urlParams.get('autoauth');
+                                if (autoAuth === 'true' || autoAuth === '1') {
+                                    console.log("🔐 Otomatik yetkilendirme başlatılıyor...");
+                                    updateOAuthStatus('🔐 Otomatik yetkilendirme...', '#FFA500');
+                                    setTimeout(() => startAuth(), 1000);
+                                } else {
+                                    updateOAuthStatus('⚠️ Yetkilendirme gerekli<br><small>Konsola "startAuth()" yazın</small>', '#FF6B6B');
+                                    console.warn("⚠️ OAuth yetkilendirmesi gerekli!");
+                                    console.log("💡 Başlatmak için: startAuth()");
+                                    console.log("💡 veya URL'e &autoauth=true ekleyin");
+                                }
+                            }
+                            
+                        } else if (data.action === 'auth_url') {
+                            console.log(`🌐 OAuth URL'i: ${data.url}`);
+                            console.log("🔐 Tarayıcınızda yetkilendirme sayfası açıldı");
+                            updateOAuthStatus('🔐 Yetkilendirme bekliyor...', '#FFA500');
+                            
+                        } else if (data.action === 'token_updated' || data.action === 'token_refreshed') {
+                            tokenValid = true;
+                            console.log(`✅ Token güncellendi! Kalan süre: ${data.remaining_time}`);
+                            updateOAuthStatus(`✅ Token aktif<br>⏱️ ${data.remaining_time}`, '#90EE90');
+                            
+                        } else if (data.action === 'message_sent') {
+                            if (data.success) {
+                                console.log(`✅ Mesaj gönderildi. Kalan süre: ${data.remaining_time}`);
+                                updateOAuthStatus(`✅ Token aktif<br>⏱️ ${data.remaining_time}`, '#90EE90');
+                            } else {
+                                console.error(`❌ Mesaj gönderilemedi: ${data.error}`);
+                            }
+                            
+                        } else if (data.action === 'status') {
+                            tokenValid = data.token_valid;
+                            console.log(`📊 Token geçerli: ${data.token_valid}, Kalan: ${data.remaining_time}`);
+                            
+                            if (data.token_valid) {
+                                updateOAuthStatus(`✅ Token aktif<br>⏱️ ${data.remaining_time}`, '#90EE90');
+                            } else {
+                                updateOAuthStatus('⚠️ Token geçersiz', '#FF6B6B');
+                            }
+                            
+                        } else if (data.action === 'auth_required') {
+                            tokenValid = false;
+                            console.error(`❌ ${data.message}`);
+                            updateOAuthStatus('❌ Yeniden yetkilendirme gerekli<br><small>startAuth()</small>', '#FF6B6B');
+                            
+                        } else if (data.action === 'chatroom_set') {
+                            console.log(`✅ Chatroom ID ayarlandı: ${data.chatroom_id}`);
+                        }
+                    } catch (error) {
+                        console.error("Proxy mesajı işlenirken hata:", error);
+                    }
+                };
+                
+                proxyWs.onclose = () => {
+                    console.log("❌ Proxy bağlantısı kesildi. 5 saniye sonra tekrar denenecek...");
+                    proxyConnected = false;
+                    tokenValid = false;
+                    updateOAuthStatus('❌ Bağlantı kesildi<br><small>Yeniden bağlanıyor...</small>', '#FF6B6B');
+                    setTimeout(connectToProxyServer, 5000);
+                };
+                
+                proxyWs.onerror = (error) => {
+                    console.error("❌ Proxy WebSocket hatası:", error);
+                    console.error("⚠️ UYARI: kick_oauth_proxy.py dosyasının çalıştığından emin olun!");
+                    updateOAuthStatus('❌ Proxy çalışmıyor!<br><small>kick_oauth_proxy.py başlatın</small>', '#FF6B6B');
+                };
+            } catch (error) {
+                console.error("Proxy'ye bağlanırken hata:", error);
+                console.error("⚠️ UYARI: python kick_oauth_proxy.py");
+                updateOAuthStatus('❌ Bağlantı hatası', '#FF6B6B');
+            }
         }
 
         function connectToKickChat(chatroomId) {
@@ -897,8 +1018,6 @@
                         }
                         
                         if (cleanContent === '!eniyi') {
-                            if (!AYARLAR.kickApiToken) return;
-                            
                             const sortedScores = Array.from(enIyiSkorlarMap.entries())
                                                       .sort((a, b) => b[1] - a[1])
                                                       .slice(0, 5); 
@@ -916,8 +1035,6 @@
                             return; 
                         
                         } else if (cleanContent === '!son') {
-                            if (!AYARLAR.kickApiToken) return;
-                            
                             let chatMesaji = "⏱️ Son Başarılı Atlayışlar: ";
                             if (sonSkorlar.length === 0) {
                                 chatMesaji = "Henüz başarılı bir atlayış olmadı.";
@@ -979,8 +1096,76 @@
         window.havuzPozisyonu = function() { console.log(havuz.getBoundingClientRect()); };
         window.karakterPozisyonlari = function() { console.log(`👥 Aktif karakterler:`, karakterPozisyonlari.size, karakterPozisyonlari); };
         
+        // OAuth ve Token yönetimi için yardımcı fonksiyonlar
+        window.startAuth = function() {
+            if (!proxyWs || proxyWs.readyState !== WebSocket.OPEN) {
+                console.error("❌ Proxy bağlantısı yok! Önce kick_oauth_proxy.py sunucusunu başlatın.");
+                return;
+            }
+            
+            if (!AYARLAR.kickChatroomID) {
+                console.error("❌ Chatroom ID bulunamadı! URL'de channelid parametresi olmalı.");
+                return;
+            }
+            
+            const authData = {
+                action: 'start_auth',
+                chatroom_id: AYARLAR.kickChatroomID
+            };
+            proxyWs.send(JSON.stringify(authData));
+            console.log("🔐 OAuth yetkilendirmesi başlatılıyor...");
+            console.log("📱 Tarayıcınızda Kick yetkilendirme sayfası açılacak");
+            console.log("✅ Kick'te izin verdikten sonra token otomatik alınacak");
+        };
+        
+        window.checkProxyStatus = function() {
+            if (!proxyWs || proxyWs.readyState !== WebSocket.OPEN) {
+                console.error("❌ Proxy bağlantısı yok!");
+                return;
+            }
+            
+            const request = {
+                action: 'check_status'
+            };
+            proxyWs.send(JSON.stringify(request));
+            console.log("📊 Proxy durumu kontrol ediliyor...");
+        };
+        
+        window.refreshTokenNow = function() {
+            if (!proxyWs || proxyWs.readyState !== WebSocket.OPEN) {
+                console.error("❌ Proxy bağlantısı yok!");
+                return;
+            }
+            
+            const request = {
+                action: 'refresh_now'
+            };
+            proxyWs.send(JSON.stringify(request));
+            console.log("🔄 Token manuel olarak yenileniyor...");
+        };
+        
+        console.log("");
+        console.log("=" .repeat(60));
+        console.log("🔐 KICK OAUTH 2.1 - OTOMATIK TOKEN YÖNETİMİ");
+        console.log("=" .repeat(60));
+        console.log("");
+        console.log("📋 Kullanılabilir Komutlar:");
+        console.log("  ➤ startAuth()          : OAuth yetkilendirme başlat (ilk kez)");
+        console.log("  ➤ checkProxyStatus()   : Token durumunu kontrol et");
+        console.log("  ➤ refreshTokenNow()    : Token'ı manuel yenile");
+        console.log("");
+        console.log("💡 İpuçları:");
+        console.log("  • Token otomatik olarak yenilenir");
+        console.log("  • İlk kullanımda startAuth() çalıştırın");
+        console.log("  • Token durumu sağ üstte gösterilir");
+        console.log("=" .repeat(60));
+        console.log("");
+        
         function baslat() {
             const chatroomId = AYARLAR.kickChatroomID;
+            
+            // Python Proxy'ye bağlan (token yönetimi için)
+            connectToProxyServer();
             
             if (chatroomId && chatroomId != 0) {
                 console.log(`Dinamik Chatroom ID ${chatroomId} ile bağlanılıyor...`);
@@ -999,4 +1184,3 @@
     </script>
     </body>
 </html>
-
