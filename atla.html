@@ -11,7 +11,12 @@
         html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background-color: transparent; font-family: 'Roboto', sans-serif; -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; text-rendering: optimizeSpeed; transform: translateZ(0); backface-visibility: hidden; image-rendering: optimizeSpeed; image-rendering: -webkit-optimize-contrast; image-rendering: crisp-edges; image-rendering: pixelated; }
         body { position: relative; min-width: 100vw; min-height: 100vh; }
         .karakter { width: 100px; aspect-ratio: 1; background-image: url('karakter.png'); background-size: contain; background-repeat: no-repeat; background-position: center; position: absolute; top: -150px; left: -150px; opacity: 0; z-index: 10; transition: opacity 0.3s ease; will-change: transform; transform: translateZ(0); }
-        #havuz { width: 300px; aspect-ratio: 2.16; background-image: url('havuz.png'); background-size: contain; background-repeat: no-repeat; background-position: center; position: absolute; bottom: 0; left: 50%; transform: translateX(-50%) translateZ(0); box-sizing: border-box; transition: opacity 0.5s ease; z-index: 5; will-change: transform, opacity; backface-visibility: hidden; image-rendering: optimizeSpeed; image-rendering: crisp-edges; }
+        
+        /* --- DEĞİŞİKLİK 1: Sabit 'aspect-ratio' kaldırıldı --- */
+        /* 'height' ve 'aspect-ratio' artık JS tarafından dinamik olarak hesaplanıp ayarlanacak. */
+        #havuz { width: 300px; background-image: url('havuz.png'); background-size: contain; background-repeat: no-repeat; background-position: center; position: absolute; bottom: 0; left: 50%; transform: translateX(-50%) translateZ(0); box-sizing: border-box; transition: opacity 0.5s ease; z-index: 5; will-change: transform, opacity; backface-visibility: hidden; image-rendering: optimizeSpeed; image-rendering: crisp-edges; }
+        /* --- DEĞİŞİKLİK 1 BİTTİ --- */
+
     </style>
     </head>
 
@@ -110,8 +115,8 @@
         let dynamicAuthorizedUsers = [];
         if (paramAuth) {
             dynamicAuthorizedUsers = paramAuth.split(',')
-                                     .map(user => user.trim().toLowerCase())
-                                     .filter(user => user.length > 0);
+                                            .map(user => user.trim().toLowerCase())
+                                            .filter(user => user.length > 0);
         }
         if (paramUserId && !dynamicAuthorizedUsers.includes(paramUserId.toLowerCase())) {
              dynamicAuthorizedUsers.push(paramUserId.toLowerCase());
@@ -155,8 +160,8 @@
             fizik: { yerCekimi: 0.05, temelHiz: 3, hizVaryasyon: 1.5, minimumAci: 15, maksimumAci: 60, minimumIvme: 0.66, maksimumIvme: 1 },
             puanlama: { 
                 // YENİ: Bu değerler target boyutuna göre dinamik olarak hesaplanacak
-                basariMesafeSiniri: 135,  // Varsayılan (target genişliği / 2)
-                puanlamaKatsayisi: 1.35   // Varsayılan (basariMesafeSiniri * 0.01)
+                basariMesafeSiniri: 150,  // Varsayılan (300 / 2)
+                puanlamaKatsayisi: 1.5   // Varsayılan (150 * 0.01)
             }
         };
 
@@ -194,37 +199,66 @@
         let sonSkorlar = [];
         
         // Target boyutu ve skorlama
-        let targetGercekGenislik = 300;  // Varsayılan havuz genişliği
-        let targetGercekYukseklik = 83;  // Varsayılan havuz yüksekliği
+        let targetGercekGenislik = 300; // İsteğiniz üzerine varsayılan genişlik 300
+        let targetGercekYukseklik = 83; // Bu, 300'e 83 (eski 2.16 ratio) varsayılanıydı, şimdi dinamik olacak
 
         // Target boyutunu algıla ve dinamik puanlama hesapla
         function targetBoyutunuAlgilaVeSkorHesapla() {
             return new Promise((resolve) => {
                 const testImg = new Image();
+                
+                // --- DEĞİŞİKLİK 2: 'onload' fonksiyonu güncellendi ---
                 testImg.onload = function() {
-                    targetGercekGenislik = this.width;
-                    targetGercekYukseklik = this.height;
+                    // Resmin orijinal boyutlarını al
+                    const originalWidth = this.naturalWidth || this.width;
+                    const originalHeight = this.naturalHeight || this.height;
                     
-                    // Dinamik puanlama hesaplaması
+                    const newBaseWidth = 300; // İstenen hedef genişlik (garanti 300px)
+                    
+                    if (originalWidth > 0) { // 0'a bölme hatasını engelle
+                        // Yeni yüksekliği en-boy oranına göre hesapla
+                        const ratio = newBaseWidth / originalWidth;
+                        const newBaseHeight = originalHeight * ratio;
+
+                        // Global değişkenleri bu yeni hesaplanmış boyutlarla güncelle
+                        targetGercekGenislik = newBaseWidth;    // 300
+                        targetGercekYukseklik = newBaseHeight; // Örn: 75 (eğer orijinal 600x150 ise)
+                    } else {
+                        // Resim yüklenemezse veya boyutu 0sa varsayılanlara dön
+                        targetGercekGenislik = 300;
+                        targetGercekYukseklik = 83; // Orijinal varsayılan (eski 2.16 oran)
+                    }
+                    // --- DEĞİŞİKLİK 2 BİTTİ ---
+
+                    // Dinamik puanlama hesaplaması (artık yeni boyutlara göre)
                     // basariMesafeSiniri = hedefin genişliğinin yarısı
                     AYARLAR.puanlama.basariMesafeSiniri = targetGercekGenislik / 2;
                     // puanlamaKatsayisi = basariMesafeSiniri'nin %1'i
                     AYARLAR.puanlama.puanlamaKatsayisi = AYARLAR.puanlama.basariMesafeSiniri * 0.01;
                     
-                    console.log(`🎯 Target boyutu algılandı: ${targetGercekGenislik}x${targetGercekYukseklik}`);
-                    console.log(`✅ Target resmi başarıyla yüklendi: ${targetBaseName}.png`);
+                    console.log(`🎯 Target boyutu algılandı (Temel 300px genişliğe göre ayarlandı): ${targetGercekGenislik}x${targetGercekYukseklik.toFixed(0)}`);
+                    console.log(`✅ Target resmi başarıyla yüklendi: ${targetBaseName}.png (Orijinal: ${originalWidth}x${originalHeight})`);
                     console.log(`📏 Başarı mesafe sınırı: ${AYARLAR.puanlama.basariMesafeSiniri.toFixed(1)} piksel (Target genişliği / 2)`);
                     console.log(`📐 Puanlama katsayısı: ${AYARLAR.puanlama.puanlamaKatsayisi.toFixed(3)} (Başarı sınırının %1'i)`);
                     resolve();
                 };
+                
+                // --- DEĞİŞİKLİK 3: 'onerror' varsayılanları netleştirildi ---
                 testImg.onerror = function() {
                     console.error(`❌ Target resmi yüklenemedi: ${targetBaseName}.png`);
-                    console.warn(`⚠️ Varsayılan boyutlar kullanılıyor`);
+                    console.warn(`⚠️ Varsayılan 300x83 boyutları kullanılıyor`);
+                    
+                    // Varsayılan değerleri manuel ayarla (global değişkenler zaten bu değerde ama garanti olsun)
+                    targetGercekGenislik = 300;
+                    targetGercekYukseklik = 83; // Eski kodunuzdaki varsayılan
+
                     // Varsayılan değerlerle de hesapla
-                    AYARLAR.puanlama.basariMesafeSiniri = targetGercekGenislik / 2;
-                    AYARLAR.puanlama.puanlamaKatsayisi = AYARLAR.puanlama.basariMesafeSiniri * 0.01;
+                    AYARLAR.puanlama.basariMesafeSiniri = targetGercekGenislik / 2; // 150
+                    AYARLAR.puanlama.puanlamaKatsayisi = AYARLAR.puanlama.basariMesafeSiniri * 0.01; // 1.5
                     resolve();
                 };
+                // --- DEĞİŞİKLİK 3 BİTTİ ---
+
                 console.log(`🔍 Target resmi yükleniyor: ${targetBaseName}.png`);
                 testImg.src = `${targetBaseName}.png`;
             });
@@ -232,6 +266,10 @@
         
         function rastgeleHavuzKonumu() {
             const guncelGenislik = Math.max(window.innerWidth, document.documentElement.clientWidth) || 1920;
+            
+            // Burası artık doğru çalışacak:
+            // targetGercekGenislik = 300
+            // targetGercekYukseklik = (hesaplanan yükseklik)
             const havuzGenisligi = Math.round(targetGercekGenislik * ortalamaOran);
             const guvenliMargin = Math.round(50 * ortalamaOran);
             const solSinir = guvenliMargin;
@@ -239,14 +277,15 @@
             const gercekSolSinir = Math.min(solSinir, sagSinir);
             const gercekSagSinir = Math.max(solSinir, sagSinir);
             const rastgeleX = Math.random() * (gercekSagSinir - gercekSolSinir) + gercekSolSinir;
-            const havuzYuksekligi = Math.round(targetGercekYukseklik * ortalamaOran);
+            const havuzYuksekligi = Math.round(targetGercekYukseklik * ortalamaOran); // Artık doğru oranı kullanıyor
+            
             havuz.style.left = rastgeleX + 'px';
             havuz.style.bottom = '0px';
             havuz.style.top = 'auto'; // CSS'deki top değerini override et
             havuz.style.transform = 'none';
             havuz.style.opacity = '1';
             havuz.style.width = havuzGenisligi + 'px';
-            havuz.style.height = havuzYuksekligi + 'px';
+            havuz.style.height = havuzYuksekligi + 'px'; // Yükseklik artık dinamik
             havuz.style.aspectRatio = 'unset'; // CSS aspect-ratio'yu override et, yükseklik manuel ayarlanıyor
             havuz.style.margin = '0'; // Margin'leri sıfırla
             havuz.style.padding = '0'; // Padding'leri sıfırla
@@ -726,8 +765,11 @@
                         const havuzWidth = parseInt(havuz.style.width) || 298;
                         const havuzMerkezi = havuzLeft + havuzWidth / 2;
                         const mesafe = Math.abs(karakterMerkez - havuzMerkezi);
+                        
+                        // Artık doğru, dinamik olarak hesaplanmış değerleri kullanıyor
                         const basariMesafeSiniri = AYARLAR.puanlama.basariMesafeSiniri * ortalamaOran;
                         const puanlamaKatsayisi = AYARLAR.puanlama.puanlamaKatsayisi * ortalamaOran;
+                        
                         if (mesafe < basariMesafeSiniri) {
                             basariliAtlayis = true;
                             // YENİ: Dinamik puanlama - target boyutuna göre otomatik ayarlanıyor
@@ -735,13 +777,13 @@
                             
                             // Hedef boyutu bilgisi (küçük hedef için ek mesaj)
                             let zorlukBilgisi = '';
-                            if (targetGercekGenislik < 200) {
+                            if (targetGercekGenislik < 200) { // 300px'e ölçeklenmiş temel genişlik
                                 zorlukBilgisi = ` 🎯 Küçük hedef!`;
                             } else if (targetGercekGenislik > 400) {
                                 zorlukBilgisi = ` 🎪 Büyük hedef!`;
                             }
                             
-                            console.log(`🏆 HAVUZ TUTTURULDU! ${kullaniciAdi} - Puan: ${puan}, Mesafe: ${mesafe.toFixed(1)}, Target: ${targetGercekGenislik}x${targetGercekYukseklik}`);
+                            console.log(`🏆 HAVUZ TUTTURULDU! ${kullaniciAdi} - Puan: ${puan}, Mesafe: ${mesafe.toFixed(1)}, Target: ${targetGercekGenislik}x${targetGercekYukseklik.toFixed(0)}`);
                             
                             const skorMesaji = `Tebrikler @${kullaniciAdi}! Havuzu ${puan.toFixed(0)} puanla tutturdun!${zorlukBilgisi}`;
                             sendChatMessageToKick(skorMesaji);
@@ -782,7 +824,7 @@
                         karakterPozisyonlari.delete(kullaniciAdi);
                         setTimeout(() => {
                             if (karakter.parentNode) karakter.parentNode.removeChild(karakter);
-                            if (kullaniciEtiketi.parentNode) kullaniciEtiketi.parentNode.removeChild(kullaniciEtiketi);
+                            if (kullaniciEtiketi.parentNode) kullaniciEtiketi.parentNode.removeChild(kullaniEtiketi);
                         }, 300);
                     }, beklemeSuresi);
                     return;
@@ -1027,8 +1069,8 @@
                         
                         if (cleanContent === '!eniyi') {
                             const sortedScores = Array.from(enIyiSkorlarMap.entries())
-                                                      .sort((a, b) => b[1] - a[1])
-                                                      .slice(0, 5); 
+                                                    .sort((a, b) => b[1] - a[1])
+                                                    .slice(0, 5); 
 
                             let chatMesaji = "🏆 En İyi 5 Skor: ";
                             if (sortedScores.length === 0) {
@@ -1158,9 +1200,9 @@
         console.log("=" .repeat(60));
         console.log("");
         console.log("📋 Kullanılabilir Komutlar:");
-        console.log("  ➤ startAuth()          : OAuth yetkilendirme başlat (ilk kez)");
-        console.log("  ➤ checkProxyStatus()   : Token durumunu kontrol et");
-        console.log("  ➤ refreshTokenNow()    : Token'ı manuel yenile");
+        console.log("  ➤ startAuth()         : OAuth yetkilendirme başlat (ilk kez)");
+        console.log("  ➤ checkProxyStatus()    : Token durumunu kontrol et");
+        console.log("  ➤ refreshTokenNow()   : Token'ı manuel yenile");
         console.log("");
         console.log("💡 İpuçları:");
         console.log("  • Token otomatik olarak yenilenir");
